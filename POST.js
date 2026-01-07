@@ -2,10 +2,11 @@
 // 运行: node POST.js
 
 const https = require('https');
+const fs = require('fs');
 
 // ============ 配置 ============
 const CONFIG = {
-    attempt: '1228',
+    attempt: '1298',
     cmid: '167',
     sesskey: 'g4ngReJi5R',
     cookies: 'MoodleSession=; MOODLEID1_='
@@ -15,7 +16,7 @@ const CONFIG = {
 // page: 页码从0开始 (第1页=0, 第2页=1...)
 // selectedChoices: 选中的选项索引 (a=0, b=1, c=2, d=3...)
 const SUBMISSIONS = [
-    { page: 1, selectedChoices: [0, 1, 3, 4, 5, 6, 7, 8] },
+    { page: 1, selectedChoices: [1, 2, 3, 4, 5, 6, 7, 8] },
     // { page: 3, selectedChoices: [0, 2] },  // 可以添加更多
 ];
 
@@ -48,10 +49,41 @@ async function getPageInfo(page) {
         }
     });
 
-    const seqMatch = res.body.match(/name="q(\d+):(\d+)_:sequencecheck"\s+value="(\d+)"/);
-    if (!seqMatch) throw new Error('无法提取页面信息，可能session过期');
+    // 更稳健的正则：允许单双引号、任意属性顺序、跨行情况
+    // sequencecheck 的值可能包含字母数字，放宽为 \w+
+    let seqMatch = res.body.match(/name=["']q(\d+):(\d+)_:sequencecheck["'][^>]*value=["'](\w+)["']/);
+    if (!seqMatch) {
+        seqMatch = res.body.match(/name=["']q(\d+):(\d+)_:sequencecheck["'][\s\S]*?value=["'](\w+)["']/);
+    }
+    if (!seqMatch) {
+        seqMatch = res.body.match(/id=["']q(\d+):(\d+)_:sequencecheck["'][^>]*value=["'](\w+)["']/);
+    }
 
-    return { questionId: seqMatch[1], slot: seqMatch[2], sequencecheck: seqMatch[3] };
+    if (!seqMatch) {
+        // 将页面保存到文件，方便离线查看原因
+        try {
+            fs.writeFileSync('./last_page.html', res.body);
+            console.error('   ⚠️ 页面内容已保存到 ./last_page.html 以供调试');
+        } catch (e) {
+            console.error('   ⚠️ 无法写入 last_page.html:', e.message);
+        }
+        throw new Error('无法提取页面信息，可能session过期（页面已保存到 last_page.html）');
+    }
+
+    const questionId = seqMatch[1];
+    const slot = seqMatch[2];
+    const sequencecheck = seqMatch[3];
+
+    // 尝试从页面中提取 sesskey（如果存在则覆盖配置中的值）
+    const sessMatch = res.body.match(/name=["']sesskey["'][^>]*value=["']([A-Za-z0-9]+)["']/);
+    if (sessMatch) {
+        CONFIG.sesskey = sessMatch[1];
+        console.log(`   🔑 从页面提取到 sesskey=${CONFIG.sesskey}`);
+    } else {
+        console.log('   ⚠️ 未能从页面提取 sesskey，使用配置中现有 sesskey');
+    }
+
+    return { questionId, slot, sequencecheck };
 }
 
 async function submitAnswer(page, info, selectedChoices) {
