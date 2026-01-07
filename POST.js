@@ -16,7 +16,14 @@ const CONFIG = {
 // page: 页码从0开始 (第1页=0, 第2页=1...)
 // selectedChoices: 选中的选项索引 (a=0, b=1, c=2, d=3...)
 const SUBMISSIONS = [
+    { page: 0, selectedChoices: [2] },
     { page: 1, selectedChoices: [1, 2, 3, 4, 5, 6, 7, 8] },
+    { page: 2, selectedChoices: [0] },
+    { page: 3, selectedChoices: [0] },
+    { page: 4, selectedChoices: [0, 3] },
+    { page: 5, selectedChoices: [1] },
+    { page: 6, selectedChoices: [2] },
+    { page: 7, selectedChoices: [0] }
     // { page: 3, selectedChoices: [0, 2] },  // 可以添加更多
 ];
 
